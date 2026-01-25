@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Identity Verification</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Ambient Background Elements -->
+    <div class="ambient-light">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="main-container">
+        <header>
+            <h1>Identity Verification</h1>
+            <p>Secure Biometric Matching System</p>
+        </header>
+
+        <div class="app-interface">
+            <!-- Left Side: Upload -->
+            <div class="panel upload-panel">
+                <h2>Input Source</h2>
+                <div class="upload-area" id="drop-zone">
+                    <div class="upload-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <p>Drop image or <span>Browse</span></p>
+                    </div>
+                    <img id="preview-img" class="image-preview hidden">
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                </div>
+            </div>
+
+            <!-- Arrow / Divider -->
+            <div class="divider">
+                <div class="arrow-icon">⟶</div>
+            </div>
+
+            <!-- Right Side: Result -->
+            <div class="panel result-panel">
+                <h2>Analysis Result</h2>
+
+                <!-- Idle State -->
+                <div class="result-placeholder" id="result-placeholder">
+                    <p>Waiting for input...</p>
+                </div>
+
+                <!-- Loading State -->
+                <div class="loader hidden" id="loader">
+                    <div class="spinner"></div>
+                    <p>Scanning Biometrics...</p>
+                </div>
+
+                <!-- Match State -->
+                <div class="match-details hidden" id="match-details">
+                    <div class="student-card">
+                        <div class="image-wrapper">
+                            <img id="sis-img" src="" alt="SIS Record">
+                        </div>
+                        <div class="info-group">
+                            <h3 id="res-name">Student Name</h3>
+                            <p class="student-id" id="res-id">ID: 00000</p>
+                            <div class="confidence-meter">
+                                <div class="fill" id="conf-fill"></div>
+                            </div>
+                            <p class="confidence-text" id="res-conf">98% Confidence</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error/No Match State -->
+                <div class="error-message hidden" id="error-message">
+                    <p id="error-text">No match found.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

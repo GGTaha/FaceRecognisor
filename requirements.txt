@@ -1,0 +1,6 @@
+flask
+deepface
+rich
+tensorflow==2.15.0
+tf-keras==2.15.0
+numpy<2
