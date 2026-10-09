@@ -319,7 +319,7 @@ h2::before {
     animation: fadeIn 0.5s var(--transition);
 }
 
-.student-card {
+.person-card {
     text-align: center;
 }
 
@@ -350,7 +350,7 @@ h2::before {
     text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
 }
 
-.student-id {
+.person-id {
     color: var(--text-secondary);
     margin: 5px 0 20px;
     font-family: 'Inter', monospace;

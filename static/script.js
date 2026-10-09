@@ -10,11 +10,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const matchDetails = document.getElementById('match-details');
     const errorMessage = document.getElementById('error-message');
 
-    const sisImg = document.getElementById('sis-img');
+    const personImg = document.getElementById('person-img');
     const resName = document.getElementById('res-name');
     const resId = document.getElementById('res-id');
     const resConf = document.getElementById('res-conf');
     const confFill = document.getElementById('conf-fill');
+
+    // Default Avatar SVG Data URI
+    const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2364748b"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
 
     // --- Glow Effect ---
     const panels = document.querySelectorAll('.panel');
@@ -83,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
         })
             .then(response => response.json())
             .then(async data => {
-                // Fake a minimum delay for smoothness if request is too fast
-                await new Promise(r => setTimeout(r, 800));
+                // Minimum delay for smoother UX
+                await new Promise(r => setTimeout(r, 600));
 
                 loader.classList.add('hidden');
 
@@ -119,8 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
             confFill.style.width = `${Math.min(data.confidence, 100)}%`;
         }, 100);
 
-        // Load SIS Image
-        loadSISImage(data.id);
+        // Load Person Reference Image
+        loadPersonImage(data.id);
     }
 
     function showError(msg) {
@@ -128,34 +131,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('error-text').textContent = msg;
     }
 
-    async function loadSISImage(id) {
-        const baseUrl = 'https://sis.cedar.edu.pk/uploads/';
-        const extensions = ['jpg', 'png', 'jpeg'];
+    function loadPersonImage(personId) {
+        personImg.src = DEFAULT_AVATAR;
+        const targetUrl = `/person-image/${encodeURIComponent(personId)}`;
 
-        // Set a gentle loading state for the image itself if needed, or placeholder
-        sisImg.src = '';
-
-        for (const ext of extensions) {
-            const url = `${baseUrl}${id}.${ext}`;
-            try {
-                const valid = await checkImage(url);
-                if (valid) {
-                    sisImg.src = url;
-                    return;
-                }
-            } catch (e) { continue; }
-        }
-
-        // If fail
-        sisImg.src = 'https://via.placeholder.com/300x300?text=No+Photo';
-    }
-
-    function checkImage(url) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-            img.src = url;
-        });
+        const img = new Image();
+        img.onload = () => {
+            personImg.src = targetUrl;
+        };
+        img.onerror = () => {
+            personImg.src = DEFAULT_AVATAR;
+        };
+        img.src = targetUrl;
     }
 });

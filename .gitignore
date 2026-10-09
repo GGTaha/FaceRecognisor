@@ -25,9 +25,11 @@ wheels/
 venv/
 .env
 
-# Application specific
+# Application data & uploads
 uploads/
-# embeddings.json # Uncomment if you want to exclude the generated face database (recommended for large datasets)
+faces/*
+!faces/.gitkeep
+embeddings.json
 
 # IDEs
 .vscode/

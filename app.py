@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 import time
 from werkzeug.utils import secure_filename
@@ -6,12 +6,14 @@ from find import identify_face
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['FACES_FOLDER'] = 'faces'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 
-# Ensure upload directory exists
+# Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['FACES_FOLDER'], exist_ok=True)
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -19,6 +21,25 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/person-image/<person_id>')
+def get_person_image(person_id):
+    """Serve the reference image for a recognized person if available."""
+    faces_dir = os.path.abspath(app.config['FACES_FOLDER'])
+    if not os.path.exists(faces_dir) and os.path.exists('known_faces'):
+        faces_dir = os.path.abspath('known_faces')
+
+    if not os.path.exists(faces_dir):
+        return jsonify({'error': 'Faces directory not found'}), 404
+
+    # Search for matching person reference photo
+    for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']:
+        candidate = f"{person_id}{ext}"
+        candidate_path = os.path.join(faces_dir, candidate)
+        if os.path.isfile(candidate_path):
+            return send_from_directory(faces_dir, candidate)
+
+    return jsonify({'error': 'Person image not found'}), 404
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -45,9 +66,6 @@ def upload_file():
             
             duration = end_time - start_time
             print(f"⏱️ Analysis took {duration:.4f} seconds")
-            
-            # Clean up the uploaded file after processing
-            # os.remove(filepath)
             
             if result:
                 return jsonify(result)

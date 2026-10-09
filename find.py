@@ -1,50 +1,93 @@
-from deepface import DeepFace
+import sys
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 import json
-import numpy as np
 import os
 from rich.console import Console
 
 console = Console()
 
-# Load precomputed embeddings
+# File paths
 EMBEDDINGS_FILE = "embeddings.json"
-STUDENT_DATA_FILE = "student_data_full.json"
+MAPPING_FILE = "names.json"
 
 def load_embeddings():
+    """Load the precomputed vector embeddings for known persons."""
     if not os.path.exists(EMBEDDINGS_FILE):
-        console.print("[bold red]⚠️ Embeddings file not found! Run main.py first.[/bold red]")
+        console.print("[bold red]⚠️ Embeddings file not found! Run setup.py first.[/bold red]")
         return None
-    with open(EMBEDDINGS_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(EMBEDDINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        console.print(f"[bold red]⚠️ Error reading {EMBEDDINGS_FILE}: {e}[/bold red]")
+        return None
 
-def load_student_data():
-    if not os.path.exists(STUDENT_DATA_FILE):
-        console.print("[bold red]⚠️ Student data file not found![/bold red]")
+def load_person_mapping():
+    """
+    Load optional filename-to-nickname / display name mapping.
+    Expected format in names.json:
+      {"image_filename_without_ext": "Display Name / Nickname"}
+    or:
+      [{"id": "image_filename_without_ext", "name": "Display Name / Nickname"}]
+    """
+    if not os.path.exists(MAPPING_FILE):
         return {}
-    with open(STUDENT_DATA_FILE, "r") as f:
-        return {student["StudentID"]: student["Name"] for student in json.load(f)}
+    try:
+        with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+            elif isinstance(data, list):
+                mapping = {}
+                for item in data:
+                    if isinstance(item, dict):
+                        key = item.get("id") or item.get("filename")
+                        val = item.get("name") or item.get("nickname")
+                        if key and val:
+                            mapping[key] = val
+                return mapping
+    except Exception as e:
+        console.print(f"[bold yellow]⚠️ Could not load {MAPPING_FILE}: {e}[/bold yellow]")
+    return {}
 
 def identify_face(test_image_path, threshold=0.45):
     """
     Identify a face in the test image by computing its embedding using ArcFace and comparing
-    it with stored embeddings using cosine similarity. A higher similarity (closer to 1) indicates
-    a better match.
+    it with stored embeddings using cosine similarity.
     
     :param test_image_path: Path to the test image.
-    :param threshold: Minimum cosine similarity required to consider a match (default: 0.8).
+    :param threshold: Minimum cosine similarity required to consider a match (default: 0.45).
     """
     embeddings = load_embeddings()
-    student_data = load_student_data()
     if embeddings is None:
-        return
+        return {"success": False, "error": "Embeddings file not found. Please run setup.py first."}
+
+    if not embeddings:
+        return {"success": False, "error": "No person embeddings found. Place images in 'faces/' and run setup.py."}
+
+    person_mapping = load_person_mapping()
 
     test_image_path = os.path.abspath(test_image_path)
     if not os.path.exists(test_image_path):
         console.print("[bold red]⚠️ Test image not found![/bold red]")
-        return
+        return {"success": False, "error": "Test image not found"}
 
     try:
-        # Generate embedding for the test image using ArcFace and retinaface for robust detection.
+        from deepface import DeepFace
+        import numpy as np
+    except ImportError as e:
+        console.print(f"[bold red]❌ Machine learning dependencies missing: {e}[/bold red]")
+        return {"success": False, "error": f"Machine learning dependency missing ({e}). Run 'pip install -r requirements.txt' or test using 'python app_test.py'."}
+
+    try:
+        # Generate embedding for the test image using ArcFace and retinaface
         representations = DeepFace.represent(
             test_image_path,
             model_name="ArcFace",
@@ -61,22 +104,23 @@ def identify_face(test_image_path, threshold=0.45):
         test_embedding = test_embedding / np.linalg.norm(test_embedding)
 
         best_match_id = None
-        best_similarity = -1  # Cosine similarity ranges from -1 to 1
+        best_similarity = -1.0  # Cosine similarity ranges from -1 to 1
 
-        # Compare the test embedding with stored embeddings using cosine similarity.
-        # Since both embeddings are normalized, the dot product gives the cosine similarity.
-        for student_id, stored_embedding in embeddings.items():
-            stored_embedding = np.array(stored_embedding)
-            similarity = np.dot(test_embedding, stored_embedding)
+        # Compare the test embedding with stored person embeddings using cosine similarity.
+        # Since both vectors are L2-normalized, the dot product equals cosine similarity.
+        for person_id, stored_embedding in embeddings.items():
+            stored_vec = np.array(stored_embedding)
+            similarity = float(np.dot(test_embedding, stored_vec))
 
             if similarity > best_similarity:
                 best_similarity = similarity
-                best_match_id = student_id
+                best_match_id = person_id
 
-        confidence = best_similarity * 100  # Expressed as a percentage
-        best_match_name = student_data.get(best_match_id, "Unknown")
+        confidence = best_similarity * 100.0  # Expressed as a percentage
+        # Default display name is the image filename itself unless an optional nickname mapping exists
+        best_match_name = person_mapping.get(best_match_id, best_match_id)
 
-        # If similarity exceeds threshold, consider it a match.
+        # Check if similarity exceeds threshold
         match_found = best_similarity >= threshold
         
         result = {
@@ -88,13 +132,15 @@ def identify_face(test_image_path, threshold=0.45):
             "similarity": float(best_similarity)
         }
 
+        display_label = f"{best_match_name} ({best_match_id})" if best_match_name != best_match_id else best_match_name
+
         if match_found:
             console.print(
-                f"[bold green]✅ Match found:[/bold green] [bold cyan]{best_match_name} ({best_match_id})[/bold cyan] with [bold yellow]{confidence:.2f}%[/bold yellow] confidence."
+                f"[bold green]✅ Match found:[/bold green] [bold cyan]{display_label}[/bold cyan] with [bold yellow]{confidence:.2f}%[/bold yellow] confidence."
             )
         else:
             console.print(
-                f"[bold red]❌ No exact match found.[/bold red] Closest match: [bold cyan]{best_match_name} ({best_match_id})[/bold cyan] with [bold yellow]{confidence:.2f}%[/bold yellow] confidence."
+                f"[bold red]❌ No exact match found.[/bold red] Closest match: [bold cyan]{display_label}[/bold cyan] with [bold yellow]{confidence:.2f}%[/bold yellow] confidence."
             )
             
         return result
@@ -104,6 +150,6 @@ def identify_face(test_image_path, threshold=0.45):
         return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
-    # Adjust the test image path as needed.
-    test_image_path = r"test\random11.png"
-    identify_face(test_image_path)
+    import sys
+    test_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join("test", "sample.png")
+    identify_face(test_path)
